@@ -52,8 +52,8 @@ func (self *ConsulReceiver) RegisterService() error {
     checkTtl := fmt.Sprintf("%ds", int((self.updateInterval * 3) / time.Second))
 
     return self.consul.Agent().ServiceRegister(&consulapi.AgentServiceRegistration{
-        ID: self.serviceName,
-        Name: self.serviceName,
+        ID:    self.serviceName,
+        Name:  self.serviceName,
         Check: &consulapi.AgentServiceCheck{
             TTL: checkTtl,
         },

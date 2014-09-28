@@ -1,2 +1,4 @@
 .godeps/
 stage/
+*.coverprofile
+release/

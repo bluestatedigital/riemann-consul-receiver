@@ -4,9 +4,11 @@ BIN=.godeps/bin
 GPM=$(BIN)/gpm
 GVP=$(BIN)/gvp
 
+## @todo should use "$(GVP) in", but that fails
 SOURCES=$(shell go list -f '{{range .GoFiles}}{{.}} {{end}}' ./... )
+TEST_SOURCES=$(shell go list -f '{{range .TestGoFiles}}{{.}} {{end}}' ./... )
 
-.PHONY: all build tools clean
+.PHONY: all build tools clean release deps test
 
 all: build
 
@@ -21,26 +23,49 @@ $(GVP): $(BIN)
 	curl -s -L -o $@ https://github.com/pote/gvp/raw/v0.1.0/bin/gvp
 	chmod +x $@
 
-tools: $(GPM) $(GVP)
-
 .godeps: $(GVP)
 	$(GVP) init
 
-## can't use "tools" as a target because it's not a real file
 .godeps/.gpm_installed: .godeps $(GPM) $(GVP) Godeps
 	$(GVP) in $(GPM) install
 	touch $@
 
-build: stage/$(NAME)
+.godeps/bin/ginkgo: .godeps/.gpm_installed
+	$(GVP) in go install github.com/onsi/ginkgo/ginkgo
 
+.godeps/bin/mockery: .godeps/.gpm_installed
+	$(GVP) in go install github.com/vektra/mockery
+
+## installs dev tools
+devtools: .godeps/bin/ginkgo .godeps/bin/mockery
+
+## just installs dependencies
+deps: .godeps/.gpm_installed
+
+## run tests
+test: .godeps/bin/ginkgo $(TEST_SOURCES)
+	$(GVP) in .godeps/bin/ginkgo
+
+## build the binary
 stage/$(NAME): .godeps/.gpm_installed stage $(SOURCES)
 	$(GVP) in go build -v -o $@ ./...
 
+## same, but shorter
+build: stage/$(NAME)
+
+## duh
 clean:
-	rm -rf stage .godeps
+	rm -rf stage .godeps release
 
-.godeps/bin/godoc: $(GVP)
-	$(GVP) in go get code.google.com/p/go.tools/cmd/godoc
+release/$(NAME): $(SOURCES)
+	docker run \
+		-i -t \
+		-v $(PWD):/gopath/src/app \
+		-w /gopath/src/app \
+		google/golang:1.3 \
+		make clean stage/$(NAME)
+	
+	mkdir -p release
+	mv stage/$(NAME) $@
 
-godoc: .godeps/bin/godoc
-	.godeps/bin/godoc -http=:6060
+release: release/$(NAME)

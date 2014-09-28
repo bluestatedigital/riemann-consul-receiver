@@ -1,4 +1,24 @@
+## prod
 github.com/armon/consul-api  045662de1042be0662fe4a1e21b57c8f7669261a
 github.com/jessevdk/go-flags 1f8fc78104c465b25629ed0fa9bbd4dffb39dd8e
 github.com/Sirupsen/logrus   89b6d460f0048bd1591d723b483f89b127257dbb
 github.com/amir/raidman      e5c0381f4e85217ed2e4fdee2d8d8c5f8e101c0e
+
+## test
+github.com/onsi/ginkgo/ginkgo 90d6a472e25d8096739d5405286ec051c87fade7
+github.com/onsi/gomega        3ca2515afb00bc39bc77d27cdbce85a7caaf103e
+github.com/stretchr/testify   de7fcff264cd05cc0c90c509ea789a436a0dd206
+
+## test codegen
+github.com/vektra/mockery 5e98d9a4390b6c1c9b9f7d326f438b5c3d01a7fc
+
+### transitive deps
+## required by raidman
+code.google.com/p/goprotobuf/proto 36be16571e14
+
+## required by mockery, I think
+github.com/vektra/errors           c64d83aba85aa4392895aadeefabbd24e89f3580
+code.google.com/p/go.tools/imports 7a99b946364f
+
+## required by testify, I think
+github.com/stretchr/objx cbeaeb16a013161a98496fad62933b1d21786672

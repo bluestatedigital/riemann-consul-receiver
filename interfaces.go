@@ -7,6 +7,7 @@ import (
 
 type RiemannClient interface {
     Send(*raidman.Event) error
+    Close()
 }
 
 type ConsulAgent interface {

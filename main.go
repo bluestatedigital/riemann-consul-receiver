@@ -71,9 +71,11 @@ func sendHealthResults(riemann RiemannClient, healthResults []consulapi.HealthCh
 }
 
 func mainLoop(
-    lockWatcher *LockWatcher,
-    healthChecker *HealthChecker,
-    riemann RiemannClient,
+    lockWatcher    *LockWatcher,
+    healthChecker  *HealthChecker,
+    riemannHost    string,
+    riemannPort    int,
+    riemannProto   string,
     updateInterval time.Duration,
 ) {
     // used to notify when lock has been lost; it'll just get closed
@@ -81,6 +83,9 @@ func mainLoop(
     
     // receives HealthCheck results
     var healthResultsChan chan []consulapi.HealthCheck
+
+    // the riemann client
+    var riemann RiemannClient
 
     keepGoing := true
     haveLock := false
@@ -101,13 +106,25 @@ func mainLoop(
             if haveLock {
                 log.Info("acquired lock")
                 
-                // get notified when we lose our lock
-                lockWatchChan = make(chan interface{})
-                go lockWatcher.WatchLock(lockWatchChan)
+                // connect to Riemann
+                riemannAddr := fmt.Sprintf("%s:%d", riemannHost, riemannPort)
+                log.Infof("connecting to Riemann at %s via %s", riemannAddr, riemannProto)
+
+                riemann, err = raidman.Dial(riemannProto, riemannAddr)
                 
-                // start retrieving health results
-                healthResultsChan = make(chan []consulapi.HealthCheck)
-                go healthChecker.WatchHealthResults(healthResultsChan)
+                if err != nil {
+                    log.Errorf("unable to connect to Riemann: %v", err)
+                    lockWatcher.ReleaseLock()
+                    haveLock = false
+                } else {
+                    // get notified when we lose our lock
+                    lockWatchChan = make(chan interface{})
+                    go lockWatcher.WatchLock(lockWatchChan)
+                    
+                    // start retrieving health results
+                    healthResultsChan = make(chan []consulapi.HealthCheck)
+                    go healthChecker.WatchHealthResults(healthResultsChan)
+                }
             } else {
                 log.Debug("could not acquire lock")
             }
@@ -130,6 +147,9 @@ func mainLoop(
                     log.Debug("closed health results channel")
                     
                     lockWatchChan = nil
+                    
+                    riemann.Close()
+                    riemann = nil
                 
                 case healthResults, more := <-healthResultsChan:
                     // channel closed if there was an error retrieving the health
@@ -160,7 +180,6 @@ func mainLoop(
 
 func main() {
     var opts Options
-    // var riemann RiemannClient
     
     _, err := flags.Parse(&opts)
     if err != nil {
@@ -224,20 +243,13 @@ func main() {
     // destroy the session when the process exits
     defer lockWatcher.DestroySession()
     
-    // connect to Riemann
-    riemannAddr := fmt.Sprintf("%s:%d", opts.RiemannHost, opts.RiemannPort)
-    log.Infof("connecting to Riemann at %s", riemannAddr)
-
-    riemann, err := raidman.Dial(opts.Proto, riemannAddr)
-    checkError("unable to create riemann client", err)
-    
     // receive OS signals so we can cleanly shut down
     // use syscall signals because os only provides Interrupt and Kill
     signalChan := make(chan os.Signal)
     signal.Notify(signalChan, syscall.SIGINT, syscall.SIGTERM)
     
     log.Debug("starting main loop")
-    go mainLoop(lockWatcher, healthChecker, riemann, updateInterval)
+    go mainLoop(lockWatcher, healthChecker, opts.RiemannHost, opts.RiemannPort, opts.Proto, updateInterval)
     
     // Block until a signal is received.
     <-signalChan

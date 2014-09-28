@@ -8,7 +8,7 @@ import (
     "github.com/armon/consul-api"
 )
 
-type ConsulReceiver struct {
+type LockWatcher struct {
     agent   ConsulAgent
     session ConsulSession
     kv      ConsulKV
@@ -28,7 +28,7 @@ type ConsulReceiver struct {
     healthWaitIdx uint64
 }
 
-func NewConsulReceiver(
+func NewLockWatcher(
     agent   ConsulAgent,
     session ConsulSession,
     kv      ConsulKV,
@@ -38,7 +38,7 @@ func NewConsulReceiver(
     lockDelay      time.Duration,
     serviceName    string,
     keyPath        string,
-) (*ConsulReceiver, error) {
+) (*LockWatcher, error) {
     if updateInterval <= lockDelay {
         return nil, fmt.Errorf("update interval must be greater than lock delay")
     }
@@ -49,7 +49,7 @@ func NewConsulReceiver(
         return nil, err
     }
     
-    rcr := &ConsulReceiver{
+    rcr := &LockWatcher{
         agent:   agent,
         session: session,
         kv:      kv,
@@ -67,7 +67,7 @@ func NewConsulReceiver(
     return rcr, nil
 }
 
-func (self *ConsulReceiver) RegisterService() error {
+func (self *LockWatcher) RegisterService() error {
     // make TTL three times the update interval
     checkTtl := fmt.Sprintf("%ds", int((self.updateInterval * 3) / time.Second))
 
@@ -80,7 +80,7 @@ func (self *ConsulReceiver) RegisterService() error {
     })
 }
 
-func (self *ConsulReceiver) InitSession() (string, error) {
+func (self *LockWatcher) InitSession() (string, error) {
     log.Debug("initializing session")
     
     self.sessionID = ""
@@ -137,7 +137,7 @@ func (self *ConsulReceiver) InitSession() (string, error) {
     return self.sessionID, nil
 }
 
-func (self *ConsulReceiver) DestroySession() {
+func (self *LockWatcher) DestroySession() {
     log.WithFields(log.Fields{
         "session": self.sessionID,
     }).Info("destroying session")
@@ -145,11 +145,11 @@ func (self *ConsulReceiver) DestroySession() {
     self.session.Destroy(self.sessionID, nil)
 }
 
-func (self *ConsulReceiver) UpdateHealthCheck() error {
+func (self *LockWatcher) UpdateHealthCheck() error {
     return self.agent.PassTTL("service:" + self.serviceName, "")
 }
 
-func (self *ConsulReceiver) AcquireLock() (bool, error) {
+func (self *LockWatcher) AcquireLock() (bool, error) {
     // verify session's still valid
     sessionEntry, _, err := self.session.Info(self.sessionID, nil)
     
@@ -184,7 +184,7 @@ func (self *ConsulReceiver) AcquireLock() (bool, error) {
     return lockedByUs, err
 }
 
-func (self *ConsulReceiver) WatchLock(watchChan chan<- interface{}) {
+func (self *LockWatcher) WatchLock(watchChan chan<- interface{}) {
     lockedByUs := true
     
     for lockedByUs {
@@ -205,7 +205,7 @@ func (self *ConsulReceiver) WatchLock(watchChan chan<- interface{}) {
     close(watchChan)
 }
 
-func (self *ConsulReceiver) ReleaseLock() error {
+func (self *LockWatcher) ReleaseLock() error {
     _, _, err := self.kv.Release(
         &consulapi.KVPair{
             Key: self.keyPath,
@@ -215,45 +215,4 @@ func (self *ConsulReceiver) ReleaseLock() error {
     )
     
     return err
-}
-
-// @todo move to different class
-func (self *ConsulReceiver) WatchHealthResults(resultsChan chan []consulapi.HealthCheck) {
-    waitIdx := uint64(0)
-    keepWatching := true
-    
-    for keepWatching {
-        log.Debugf("retrieving health results; WaitIndex=%d", waitIdx)
-
-        healthChecks, queryMeta, err := self.health.State("any", &consulapi.QueryOptions{
-            WaitIndex: waitIdx,
-            WaitTime:  self.updateInterval,
-        })
-        
-        if err != nil {
-            log.Errorf("error retrieving health results: %v", err)
-            break
-        }
-        
-        waitIdx = queryMeta.LastIndex
-        
-        var results []consulapi.HealthCheck
-        for _, hc := range healthChecks {
-            results = append(results, *hc)
-        }
-        
-        log.Debug("sending health results")
-        select {
-            case resultsChan <- results:
-                // successfully sent results
-            
-            case <-resultsChan:
-                // any value, but probably nil
-                // break out of loop, which will then close the channel
-                keepWatching = false
-        }
-    }
-    
-    log.Info("health results watch stopped")
-    close(resultsChan)
 }

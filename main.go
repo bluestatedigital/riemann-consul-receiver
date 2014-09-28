@@ -70,7 +70,12 @@ func sendHealthResults(riemann RiemannClient, healthResults []consulapi.HealthCh
     return nil
 }
 
-func mainLoop(receiver *ConsulReceiver, riemann RiemannClient, updateInterval time.Duration) {
+func mainLoop(
+    lockWatcher *LockWatcher,
+    healthChecker *HealthChecker,
+    riemann RiemannClient,
+    updateInterval time.Duration,
+) {
     // used to notify when lock has been lost; it'll just get closed
     var lockWatchChan chan interface{}
     
@@ -83,14 +88,14 @@ func mainLoop(receiver *ConsulReceiver, riemann RiemannClient, updateInterval ti
     for keepGoing {
         // @todo update health check only when don't have lock or when health
         // results are processed successfully.
-        err := receiver.UpdateHealthCheck()
+        err := lockWatcher.UpdateHealthCheck()
         checkError("unable to submit health check", err)
 
         if ! haveLock {
             log.Debug("acquiring lock")
             
             // don't have lock; attempt to acquire it. AcquireLock() blocks.
-            haveLock, err = receiver.AcquireLock()
+            haveLock, err = lockWatcher.AcquireLock()
             checkError("error acquiring lock", err)
             
             if haveLock {
@@ -98,11 +103,11 @@ func mainLoop(receiver *ConsulReceiver, riemann RiemannClient, updateInterval ti
                 
                 // get notified when we lose our lock
                 lockWatchChan = make(chan interface{})
-                go receiver.WatchLock(lockWatchChan)
+                go lockWatcher.WatchLock(lockWatchChan)
                 
                 // start retrieving health results
                 healthResultsChan = make(chan []consulapi.HealthCheck)
-                go receiver.WatchHealthResults(healthResultsChan)
+                go healthChecker.WatchHealthResults(healthResultsChan)
             } else {
                 log.Debug("could not acquire lock")
             }
@@ -139,11 +144,11 @@ func mainLoop(receiver *ConsulReceiver, riemann RiemannClient, updateInterval ti
                         if err != nil {
                             log.Errorf("error sending event to Riemann: %v", err)
                             
-                            receiver.ReleaseLock()
+                            lockWatcher.ReleaseLock()
                         }
                     } else {
                         // lost lock or error occurred retrieving health results
-                        receiver.ReleaseLock()
+                        lockWatcher.ReleaseLock()
                     }
 
                 case <-time.After(updateInterval):
@@ -195,7 +200,7 @@ func main() {
     consul, err := consulapi.NewClient(consulConfig)
     checkError("unable to create consul client", err)
     
-    receiver, err := NewConsulReceiver(
+    lockWatcher, err := NewLockWatcher(
         consul.Agent(),
         consul.Session(),
         consul.KV(),
@@ -208,14 +213,16 @@ func main() {
     
     checkError("unable to initialize consul receiver", err)
     
-    err = receiver.RegisterService()
+    healthChecker := NewHealthChecker(consul.Health(), updateInterval)
+    
+    err = lockWatcher.RegisterService()
     checkError("unable to register service", err)
     
-    _, err = receiver.InitSession()
+    _, err = lockWatcher.InitSession()
     checkError("unable to init session", err)
     
     // destroy the session when the process exits
-    defer receiver.DestroySession()
+    defer lockWatcher.DestroySession()
     
     // connect to Riemann
     riemannAddr := fmt.Sprintf("%s:%d", opts.RiemannHost, opts.RiemannPort)
@@ -230,7 +237,7 @@ func main() {
     signal.Notify(signalChan, syscall.SIGINT, syscall.SIGTERM)
     
     log.Debug("starting main loop")
-    go mainLoop(receiver, riemann, updateInterval)
+    go mainLoop(lockWatcher, healthChecker, riemann, updateInterval)
     
     // Block until a signal is received.
     <-signalChan

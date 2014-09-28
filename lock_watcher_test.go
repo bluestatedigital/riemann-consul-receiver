@@ -8,130 +8,8 @@ import (
     "github.com/armon/consul-api"
 )
 
-type MockAgent struct {
-    mock.Mock
-}
-
-func (m *MockAgent) Self() (map[string]map[string]interface{}, error) {
-    ret := m.Called()
-
-    r0 := ret.Get(0).(map[string]map[string]interface{})
-    r1 := ret.Error(1)
-
-    return r0, r1
-}
-
-func (m *MockAgent) ServiceRegister(service *consulapi.AgentServiceRegistration) error {
-    ret := m.Called(service)
-
-    r0 := ret.Error(0)
-
-    return r0
-}
-
-func (m *MockAgent) PassTTL(checkID, note string) error {
-    ret := m.Called(checkID, note)
-
-    r0 := ret.Error(0)
-
-    return r0
-}
-
-type MockSession struct {
-    mock.Mock
-}
-
-func (m *MockSession) List(q *consulapi.QueryOptions) ([]*consulapi.SessionEntry, *consulapi.QueryMeta, error) {
-    ret := m.Called(q)
-
-    r0 := ret.Get(0).([]*consulapi.SessionEntry)
-    r1 := ret.Get(1).(*consulapi.QueryMeta)
-    r2 := ret.Error(2)
-
-    return r0, r1, r2
-}
-func (m *MockSession) Create(se *consulapi.SessionEntry, q *consulapi.WriteOptions) (string, *consulapi.WriteMeta, error) {
-    ret := m.Called(se, q)
-
-    r0 := ret.Get(0).(string)
-    r1 := ret.Get(1).(*consulapi.WriteMeta)
-    r2 := ret.Error(2)
-
-    return r0, r1, r2
-}
-func (m *MockSession) Info(id string, q *consulapi.QueryOptions) (*consulapi.SessionEntry, *consulapi.QueryMeta, error) {
-    ret := m.Called(id, q)
-    
-    var retSess *consulapi.SessionEntry = nil
-    
-    if ret.Get(0) != nil {
-        retSess = ret.Get(0).(*consulapi.SessionEntry)
-    }
-    
-    r1 := ret.Get(1).(*consulapi.QueryMeta)
-    r2 := ret.Error(2)
-
-    return retSess, r1, r2
-}
-func (m *MockSession) Destroy(id string, q *consulapi.WriteOptions) (*consulapi.WriteMeta, error) {
-    ret := m.Called(id, q)
-
-    r0 := ret.Get(0).(*consulapi.WriteMeta)
-    r1 := ret.Error(1)
-
-    return r0, r1
-}
-
-type MockKV struct {
-    mock.Mock
-}
-
-func (m *MockKV) Acquire(p *consulapi.KVPair, q *consulapi.WriteOptions) (bool, *consulapi.WriteMeta, error) {
-    ret := m.Called(p, q)
-
-    r0 := ret.Get(0).(bool)
-    r1 := ret.Get(1).(*consulapi.WriteMeta)
-    r2 := ret.Error(2)
-
-    return r0, r1, r2
-}
-
-func (m *MockKV) Get(key string, q *consulapi.QueryOptions) (*consulapi.KVPair, *consulapi.QueryMeta, error) {
-    ret := m.Called(key, q)
-
-    r0 := ret.Get(0).(*consulapi.KVPair)
-    r1 := ret.Get(1).(*consulapi.QueryMeta)
-    r2 := ret.Error(2)
-
-    return r0, r1, r2
-}
-
-func (m *MockKV) Release(p *consulapi.KVPair, q *consulapi.WriteOptions) (bool, *consulapi.WriteMeta, error) {
-    ret := m.Called(p, q)
-
-    r0 := ret.Get(0).(bool)
-    r1 := ret.Get(1).(*consulapi.WriteMeta)
-    r2 := ret.Error(2)
-
-    return r0, r1, r2
-}
-
-type MockHealth struct {
-    mock.Mock
-}
-
-func (m *MockHealth) State(state string, q *consulapi.QueryOptions) ([]*consulapi.HealthCheck, *consulapi.QueryMeta, error) {
-    ret := m.Called(state, q)
-
-    r0 := ret.Get(0).([]*consulapi.HealthCheck)
-    r1 := ret.Get(1).(*consulapi.QueryMeta)
-    r2 := ret.Error(2)
-
-    return r0, r1, r2
-}
-
-var _ = Describe("ConsulReceiver", func() {
-    var receiver *ConsulReceiver
+var _ = Describe("LockWatcher", func() {
+    var receiver *LockWatcher
     var err error
     
     var mockAgent   MockAgent
@@ -159,7 +37,7 @@ var _ = Describe("ConsulReceiver", func() {
             nil,
         )
         
-        receiver, err = NewConsulReceiver(
+        receiver, err = NewLockWatcher(
             &mockAgent,
             &mockSession,
             &mockKV,
@@ -626,53 +504,4 @@ var _ = Describe("ConsulReceiver", func() {
         })
     })
 
-    Describe("health watching", func() {
-        It("polls and stops when told", func(done Done) {
-            genericQueryOpts := mock.AnythingOfType("*consulapi.QueryOptions")
-            
-            mockHealth.On("State", "any", genericQueryOpts).Return(
-                []*consulapi.HealthCheck{
-                    &consulapi.HealthCheck{
-                        Node:        nodeName,
-                        CheckID:     "service:" + serviceName,
-                        Name:        serviceName,
-                        Status:      "passing",
-                        Notes:       "'s good, yo",
-                        Output:      "",
-                        ServiceID:   serviceName,
-                        ServiceName: serviceName,
-                    },
-                },
-                &consulapi.QueryMeta{
-                    LastIndex: 10,
-                },
-                nil,
-            ).Twice()
-
-            // channel for receiving results
-            c := make(chan []consulapi.HealthCheck)
-            
-            // start polling
-            go receiver.WatchHealthResults(c)
-            
-            // read first set of results.  sender blocks until written, we block
-            // until read.
-            results, more := <-c
-            Expect(len(results)).To(Equal(1))
-            Expect(more).To(Equal(true))
-            
-            // now close the channel
-            c <- nil
-            
-            // read from the channel again; should be closed
-            _, more = <-c
-            Expect(more).To(Equal(false))
-            
-            mockHealth.AssertExpectations(GinkgoT())
-
-            // test's done *bing!*
-            close(done)
-        })
-        
-    })
 })

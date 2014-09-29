@@ -1,0 +1,13 @@
+# -*- bash -*-
+
+## required
+# RIEMANN_HOST
+
+## defaults
+# DEBUG="false"
+# RIEMANN_PORT="5555"
+# RIEMANN_PROTO="udp"
+# CONSUL_HOST="127.0.0.1"
+# CONSUL_PORT="8500"
+# UPDATE_INTERVAL="1m"
+# LOCK_DELAY="15s"

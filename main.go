@@ -15,15 +15,15 @@ import (
 )
 
 type Options struct {
-    Debug          bool   `                    long:"debug"                                            description:"enable debug logging"`
-    LogFile        string `env:"LOG_FILE"      long:"log-file"                                         description:"JSON log file path"`
-    RiemannHost    string `env:"RIEMANN_HOST"  long:"riemann-host" required:"true"                     description:"Riemann host"`
-    RiemannPort    int    `env:"RIEMANN_PORT"  long:"riemann-port"                 default:"5555"      description:"Riemann port"`
-    Proto          string `env:"RIEMANN_PROTO" long:"proto"                        default:"udp"       description:"protocol to use when sending Riemann events"`
-    ConsulHost     string `                    long:"consul-host"                  default:"127.0.0.1" description:"Consul host"`
-    ConsulPort     int    `                    long:"consul-port"                  default:"8500"      description:"Consul port"`
-    UpdateInterval string `                    long:"interval"                     default:"1m"        description:"how frequently to post events to Riemann"`
-    LockDelay      string `                    long:"lock-delay"                   default:"15s"       description:"lock delay after session invalidation"`
+    Debug          bool   `env:"DEBUG"           long:"debug"                                            description:"enable debug logging"`
+    LogFile        string `env:"LOG_FILE"        long:"log-file"                                         description:"JSON log file path"`
+    RiemannHost    string `env:"RIEMANN_HOST"    long:"riemann-host" required:"true"                     description:"Riemann host"`
+    RiemannPort    int    `env:"RIEMANN_PORT"    long:"riemann-port"                 default:"5555"      description:"Riemann port"`
+    Proto          string `env:"RIEMANN_PROTO"   long:"proto"                        default:"udp"       description:"protocol to use when sending Riemann events"`
+    ConsulHost     string `env:"CONSUL_HOST"     long:"consul-host"                  default:"127.0.0.1" description:"Consul host"`
+    ConsulPort     int    `env:"CONSUL_PORT"     long:"consul-port"                  default:"8500"      description:"Consul port"`
+    UpdateInterval string `env:"UPDATE_INTERVAL" long:"interval"                     default:"1m"        description:"how frequently to post events to Riemann"`
+    LockDelay      string `env:"LOCK_DELAY"      long:"lock-delay"                   default:"15s"       description:"lock delay after session invalidation"`
 }
 
 func sendHealthResults(riemann RiemannClient, healthResults []consulapi.HealthCheck, updateInterval time.Duration) error {

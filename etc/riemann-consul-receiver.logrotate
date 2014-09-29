@@ -1,0 +1,9 @@
+/var/log/riemann-consul-receiver {
+    daily
+    rotate 10
+    copytruncate
+    delaycompress
+    compress
+    notifempty
+    missingok
+}

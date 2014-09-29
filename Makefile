@@ -63,7 +63,7 @@ release/$(NAME): $(SOURCES)
 		-v $(PWD):/gopath/src/app \
 		-w /gopath/src/app \
 		google/golang:1.3 \
-		make clean stage/$(NAME)
+		make clean test build
 	
 	mkdir -p release
 	mv stage/$(NAME) $@

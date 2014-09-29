@@ -68,7 +68,6 @@ start() {
         " { $exec & } ; echo \$! >| $pidfile "
     
     RETVAL=$?
-    # echo
     
     if [ $RETVAL -eq 0 ]; then
         touch $lockfile
@@ -118,12 +117,6 @@ restart() {
     start
 }
 
-reload() {
-    echo -n $"Reloading $prog: "
-    killproc -p $pidfile $exec -HUP
-    echo
-}
-
 force_reload() {
     restart
 }
@@ -152,10 +145,6 @@ case "$1" in
     restart)
         $1
         ;;
-    reload)
-        rh_status_q || exit 7
-        $1
-        ;;
     force-reload)
         force_reload
         ;;
@@ -167,7 +156,7 @@ case "$1" in
         restart
         ;;
     *)
-        echo $"Usage: $0 {start|stop|status|restart|condrestart|try-restart|reload|force-reload}"
+        echo $"Usage: $0 {start|stop|status|restart|condrestart|try-restart|force-reload}"
         exit 2
 esac
 

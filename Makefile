@@ -1,5 +1,6 @@
 NAME=riemann-consul-receiver
-VER=$(shell git describe --always --dirty )
+## tags are like v1.0.0
+VER=$(shell git describe --always --dirty | sed -e 's/^v//g' )
 BIN=.godeps/bin
 
 GPM=$(BIN)/gpm
@@ -9,66 +10,78 @@ GVP=$(BIN)/gvp
 SOURCES=$(shell go list -f '{{range .GoFiles}}{{.}} {{end}}' ./... )
 TEST_SOURCES=$(shell go list -f '{{range .TestGoFiles}}{{.}} {{end}}' ./... )
 
-.PHONY: all build tools clean release deps test
+.PHONY: all devtools deps test build clean rpm
+
+## targets after a | are order-only; the presence of the target is sufficient
+## http://stackoverflow.com/questions/4248300/in-a-makefile-is-a-directory-name-a-phony-target-or-real-target
 
 all: build
 
 $(BIN) stage:
 	mkdir -p $@
 
-$(GPM): $(BIN)
+$(GPM): | $(BIN)
 	curl -s -L -o $@ https://github.com/pote/gpm/raw/v1.2.3/bin/gpm
 	chmod +x $@
 
-$(GVP): $(BIN)
+$(GVP): | $(BIN)
 	curl -s -L -o $@ https://github.com/pote/gvp/raw/v0.1.0/bin/gvp
 	chmod +x $@
 
-.godeps: $(GVP)
-	$(GVP) init
-
-.godeps/.gpm_installed: .godeps $(GPM) $(GVP) Godeps
+.godeps/.gpm_installed: $(GPM) $(GVP) Godeps
 	$(GVP) in $(GPM) install
 	touch $@
 
-.godeps/bin/ginkgo: .godeps/.gpm_installed
+$(BIN)/ginkgo: .godeps/.gpm_installed
 	$(GVP) in go install github.com/onsi/ginkgo/ginkgo
+	touch $@
 
-.godeps/bin/mockery: .godeps/.gpm_installed
+$(BIN)/mockery: .godeps/.gpm_installed
 	$(GVP) in go install github.com/vektra/mockery
+	touch $@
 
 ## installs dev tools
-devtools: .godeps/bin/ginkgo .godeps/bin/mockery
+devtools: $(BIN)/ginkgo $(BIN)/mockery
 
 ## just installs dependencies
 deps: .godeps/.gpm_installed
 
 ## run tests
-test: .godeps/bin/ginkgo $(TEST_SOURCES)
-	$(GVP) in .godeps/bin/ginkgo
+test: $(BIN)/ginkgo $(TEST_SOURCES)
+	$(GVP) in $(BIN)/ginkgo
 
 ## build the binary
-stage/$(NAME): .godeps/.gpm_installed stage $(SOURCES)
-	## augh!  gvp shell escaping!!
-	## https://github.com/pote/gvp/issues/22
+## augh!  gvp shell escaping!!
+## https://github.com/pote/gvp/issues/22
+stage/$(NAME): .godeps/.gpm_installed $(SOURCES) | stage
 	$(GVP) in go build -o $@ -ldflags '-X\ main.version\ $(VER)' -v ./...
 
 ## same, but shorter
-build: stage/$(NAME)
+build: test stage/$(NAME)
 
 ## duh
 clean:
 	rm -rf stage .godeps release
 
-release/$(NAME): $(SOURCES)
-	docker run \
-		-i -t \
-		-v $(PWD):/gopath/src/app \
-		-w /gopath/src/app \
-		google/golang:1.3 \
-		make clean test build
+rpm: build
+	mkdir -p stage/rpm/usr/bin stage/rpm/etc/logrotate.d stage/rpm/etc/sysconfig stage/rpm/etc/rc.d/init.d
 	
-	mkdir -p release
-	mv stage/$(NAME) $@
+	cp stage/$(NAME) stage/rpm/usr/bin/
+	
+	## config file
+	cp etc/sysconfig stage/rpm/etc/sysconfig/$(NAME)
+	cp etc/riemann-consul-receiver.logrotate stage/rpm/etc/logrotate.d/$(NAME)
+	
+	## init script
+	cp etc/sysvinit.sh stage/rpm/etc/rc.d/init.d/$(NAME)
+	chmod 555 stage/rpm/etc/rc.d/init.d/$(NAME)
 
-release: release/$(NAME)
+	cd stage && fpm \
+	    -s dir \
+	    -t rpm \
+	    -n $(NAME) \
+	    -v $(VER) \
+	    --rpm-use-file-permissions \
+	    --config-files /etc/sysconfig/$(NAME) \
+	    -C rpm \
+	    etc usr

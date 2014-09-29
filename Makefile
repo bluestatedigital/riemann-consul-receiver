@@ -1,4 +1,5 @@
 NAME=riemann-consul-receiver
+VER=$(shell git describe --always --dirty )
 BIN=.godeps/bin
 
 GPM=$(BIN)/gpm
@@ -48,7 +49,9 @@ test: .godeps/bin/ginkgo $(TEST_SOURCES)
 
 ## build the binary
 stage/$(NAME): .godeps/.gpm_installed stage $(SOURCES)
-	$(GVP) in go build -v -o $@ ./...
+	## augh!  gvp shell escaping!!
+	## https://github.com/pote/gvp/issues/22
+	$(GVP) in go build -o $@ -ldflags '-X\ main.version\ $(VER)' -v ./...
 
 ## same, but shorter
 build: stage/$(NAME)

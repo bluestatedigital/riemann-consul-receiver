@@ -14,6 +14,9 @@ import (
     "github.com/amir/raidman"
 )
 
+// http://technosophos.com/2014/06/11/compile-time-string-in-go.html
+var version string = "undef"
+
 type Options struct {
     Debug          bool   `env:"DEBUG"           long:"debug"                                            description:"enable debug logging"`
     LogFile        string `env:"LOG_FILE"        long:"log-file"                                         description:"JSON log file path"`
@@ -24,6 +27,7 @@ type Options struct {
     ConsulPort     int    `env:"CONSUL_PORT"     long:"consul-port"                  default:"8500"      description:"Consul port"`
     UpdateInterval string `env:"UPDATE_INTERVAL" long:"interval"                     default:"1m"        description:"how frequently to post events to Riemann"`
     LockDelay      string `env:"LOCK_DELAY"      long:"lock-delay"                   default:"15s"       description:"lock delay after session invalidation"`
+    PrintVersion   bool   `                      long:"version"                                          description:"display version and exit"`
 }
 
 func sendHealthResults(riemann RiemannClient, healthResults []consulapi.HealthCheck, updateInterval time.Duration) error {
@@ -184,6 +188,11 @@ func main() {
     _, err := flags.Parse(&opts)
     if err != nil {
         os.Exit(1)
+    }
+    
+    if opts.PrintVersion {
+        fmt.Printf("Version: %s\n", version)
+        os.Exit(0)
     }
     
     // parse UpdateInterval and LockDelay before setting up logging

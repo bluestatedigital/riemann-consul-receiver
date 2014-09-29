@@ -132,7 +132,7 @@ func (self *LockWatcher) InitSession() (string, error) {
     
     log.WithFields(log.Fields{
         "session": self.sessionID,
-    }).Debug("have session")
+    }).Info("have session")
     
     return self.sessionID, nil
 }

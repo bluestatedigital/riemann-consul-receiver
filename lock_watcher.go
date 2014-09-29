@@ -163,7 +163,7 @@ func (self *LockWatcher) AcquireLock() (bool, error) {
     
     kvp, queryMeta, err := self.kv.Get(self.keyPath, &consulapi.QueryOptions{
         WaitIndex: self.keyModifyIdx,
-        WaitTime: self.updateInterval,
+        WaitTime: self.lockDelay,
     })
     
     if err != nil {

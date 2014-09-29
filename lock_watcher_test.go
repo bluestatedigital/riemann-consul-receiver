@@ -386,7 +386,7 @@ var _ = Describe("LockWatcher", func() {
             queryOpts = kvGet.Arguments.Get(1).(*consulapi.QueryOptions)
             Expect(queryOpts).NotTo(BeNil())
             Expect(queryOpts.WaitIndex).To(Equal(uint64(0)))
-            Expect(queryOpts.WaitTime).To(Equal(updateInterval))
+            Expect(queryOpts.WaitTime).To(Equal(lockDelay))
 
             // second call
             kvGet = mockKV.Calls[1]
@@ -395,7 +395,7 @@ var _ = Describe("LockWatcher", func() {
             queryOpts = kvGet.Arguments.Get(1).(*consulapi.QueryOptions)
             Expect(queryOpts).NotTo(BeNil())
             Expect(queryOpts.WaitIndex).To(Equal(uint64(10)))
-            Expect(queryOpts.WaitTime).To(Equal(updateInterval))
+            Expect(queryOpts.WaitTime).To(Equal(lockDelay))
         })
     })
 

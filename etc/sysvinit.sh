@@ -133,8 +133,6 @@ rh_status() {
     
     RETVAL=$?
     
-    [ $RETVAL -eq 0 ] && $exec members
-    
     return $RETVAL
 }
 

@@ -30,7 +30,7 @@ type Options struct {
     PrintVersion   bool   `                      long:"version"                                          description:"display version and exit"`
 }
 
-func sendHealthResults(riemann RiemannClient, healthResults []consulapi.HealthCheck, updateInterval time.Duration) error {
+func sendHealthResults(riemann RiemannClient, healthResults []consulapi.HealthCheck, updateInterval time.Duration, nodeName, dc string) error {
     for _, healthCheck := range healthResults {
         // {
         //   "Name": "Service 'client-youngaustria' check",
@@ -62,6 +62,10 @@ func sendHealthResults(riemann RiemannClient, healthResults []consulapi.HealthCh
             State:       state,
             Service:     healthCheck.CheckID, // @todo CheckID or ServiceID?
             Description: healthCheck.Output,
+            Attributes:  map[string]string{
+                "reporting_node": nodeName,
+                "datacenter":     dc,
+            },
         }
         
         err := riemann.Send(evt)
@@ -81,6 +85,8 @@ func mainLoop(
     riemannPort    int,
     riemannProto   string,
     updateInterval time.Duration,
+    nodeName       string,
+    dc             string,
 ) {
     // used to notify when lock has been lost; it'll just get closed
     var lockWatchChan chan interface{}
@@ -163,7 +169,7 @@ func mainLoop(
 
                     if more && haveLock {
                         log.Debug("processing health results")
-                        err := sendHealthResults(riemann, healthResults, updateInterval)
+                        err := sendHealthResults(riemann, healthResults, updateInterval, nodeName, dc)
                         
                         if err != nil {
                             log.Errorf("error sending event to Riemann: %v", err)
@@ -228,6 +234,13 @@ func main() {
     consul, err := consulapi.NewClient(consulConfig)
     checkError("unable to create consul client", err)
     
+    // need dc and node name for riemann event attributes
+    agentInfo, err := consul.Agent().Self()
+    checkError("unable to retrieve agent info", err)
+
+    nodeName := agentInfo["Config"]["NodeName"].(string)
+    dc := agentInfo["Config"]["Datacenter"].(string)
+
     lockWatcher, err := NewLockWatcher(
         consul.Agent(),
         consul.Session(),
@@ -258,7 +271,7 @@ func main() {
     signal.Notify(signalChan, syscall.SIGINT, syscall.SIGTERM)
     
     log.Debug("starting main loop")
-    go mainLoop(lockWatcher, healthChecker, opts.RiemannHost, opts.RiemannPort, opts.Proto, updateInterval)
+    go mainLoop(lockWatcher, healthChecker, opts.RiemannHost, opts.RiemannPort, opts.Proto, updateInterval, nodeName, dc)
     
     // Block until a signal is received.
     <-signalChan

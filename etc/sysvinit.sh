@@ -81,26 +81,11 @@ start() {
 }
 
 stop() {
-    echo -n $"Stopping $prog: "
+    echo -n $"Stopping $name: "
     
-    ## wait up to 10s for the daemon to exit
-    count=0
-    stopped=0
-    pid=$( cat ${pidfile} )
-    while [ $count -lt 10 ] && [ $stopped -ne 1 ]; do
-        count=$(( count + 1 ))
-        
-        if ! checkpid ${pid} ; then
-            stopped=1
-        else
-            sleep 1
-        fi
-    done
-    
-    if [ $stopped -ne 1 ]; then
-        RETVAL=125
-    fi
-    
+    killproc -p $pidfile $name
+    RETVAL=$?
+
     if [ $RETVAL -eq 0 ]; then
         success
         rm -f $lockfile $pidfile

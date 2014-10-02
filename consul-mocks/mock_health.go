@@ -1,4 +1,4 @@
-package main
+package consulmocks
 
 import (
     "github.com/stretchr/testify/mock"

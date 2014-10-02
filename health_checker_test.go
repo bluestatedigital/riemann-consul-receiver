@@ -5,10 +5,11 @@ import (
     
     "github.com/stretchr/testify/mock"
     "github.com/armon/consul-api"
+    "github.com/bluestatedigital/riemann-consul-receiver/consul-mocks"
 )
 
 var _ = Describe("health checker", func() {
-    var mockHealth    MockHealth
+    var mockHealth    consulmocks.MockHealth
     var healthChecker *HealthChecker
 
     serviceName := "some-service"
@@ -22,7 +23,7 @@ var _ = Describe("health checker", func() {
             updateInterval,
         )
 
-        mockHealth  = MockHealth{}
+        mockHealth  = consulmocks.MockHealth{}
     })
 
     It("polls and stops when told", func(done Done) {

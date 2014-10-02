@@ -4,11 +4,12 @@ VER=$(shell git describe --always --dirty | sed -e 's/^v//g' )
 BIN=.godeps/bin
 
 GPM=$(BIN)/gpm
+GPM_LINK=$(BIN)/gpm-link
 GVP=$(BIN)/gvp
 
 ## @todo should use "$(GVP) in", but that fails
-SOURCES=$(shell go list -f '{{range .GoFiles}}{{.}} {{end}}' ./... )
-TEST_SOURCES=$(shell go list -f '{{range .TestGoFiles}}{{.}} {{end}}' ./... )
+SOURCES=$(shell go list -f '{{range .GoFiles}}{{.}} {{end}}' . )
+TEST_SOURCES=$(shell go list -f '{{range .TestGoFiles}}{{ $$.Dir }}/{{.}} {{end}}' . | sed -e "s@$(PWD)/@@g" )
 
 .PHONY: all devtools deps test build clean rpm
 
@@ -21,14 +22,19 @@ $(BIN) stage:
 	mkdir -p $@
 
 $(GPM): | $(BIN)
-	curl -s -L -o $@ https://github.com/pote/gpm/raw/v1.2.3/bin/gpm
+	curl -s -L -o $@ https://github.com/pote/gpm/raw/v1.3.1/bin/gpm
+	chmod +x $@
+
+$(GPM_LINK): | $(BIN)
+	curl -s -L -o $@ https://github.com/elcuervo/gpm-link/raw/v0.0.1/bin/gpm-link
 	chmod +x $@
 
 $(GVP): | $(BIN)
 	curl -s -L -o $@ https://github.com/pote/gvp/raw/v0.1.0/bin/gvp
 	chmod +x $@
 
-.godeps/.gpm_installed: $(GPM) $(GVP) Godeps
+.godeps/.gpm_installed: $(GPM) $(GVP) $(GPM_LINK) Godeps
+	$(GVP) in $(GPM) link add github.com/bluestatedigital/riemann-consul-receiver $(PWD)
 	$(GVP) in $(GPM) install
 	touch $@
 
@@ -54,7 +60,7 @@ test: $(BIN)/ginkgo $(TEST_SOURCES)
 ## augh!  gvp shell escaping!!
 ## https://github.com/pote/gvp/issues/22
 stage/$(NAME): .godeps/.gpm_installed $(SOURCES) | stage
-	$(GVP) in go build -o $@ -ldflags '-X\ main.version\ $(VER)' -v ./...
+	$(GVP) in go build -o $@ -ldflags '-X\ main.version\ $(VER)' -v .
 
 ## same, but shorter
 build: test stage/$(NAME)

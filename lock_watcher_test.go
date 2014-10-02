@@ -4,18 +4,18 @@ import (
 	"time"
 
     "github.com/stretchr/testify/mock"
-    
     "github.com/armon/consul-api"
+    "github.com/bluestatedigital/riemann-consul-receiver/consul-mocks"
 )
 
 var _ = Describe("LockWatcher", func() {
     var receiver *LockWatcher
     var err error
     
-    var mockAgent   MockAgent
-    var mockSession MockSession
-    var mockKV      MockKV
-    var mockHealth  MockHealth
+    var mockAgent   consulmocks.MockAgent
+    var mockSession consulmocks.MockSession
+    var mockKV      consulmocks.MockKV
+    var mockHealth  consulmocks.MockHealth
     
     serviceName := "some-service"
     keyName     := "some/key"
@@ -26,7 +26,7 @@ var _ = Describe("LockWatcher", func() {
     lockDelay := time.Second * 15
     
     BeforeEach(func() {
-        mockAgent = MockAgent{}
+        mockAgent = consulmocks.MockAgent{}
         
         mockAgent.On("Self").Return(
             map[string]map[string]interface{}{
@@ -56,12 +56,12 @@ var _ = Describe("LockWatcher", func() {
         Expect(err).To(BeNil())
         
         // replace with a fresh instance
-        mockAgent = MockAgent{}
+        mockAgent = consulmocks.MockAgent{}
         
         // not used in setup
-        mockSession = MockSession{}
-        mockKV      = MockKV{}
-        mockHealth  = MockHealth{}
+        mockSession = consulmocks.MockSession{}
+        mockKV      = consulmocks.MockKV{}
+        mockHealth  = consulmocks.MockHealth{}
     })
     
     registersService := func() {

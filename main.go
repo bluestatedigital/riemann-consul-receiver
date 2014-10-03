@@ -30,7 +30,7 @@ type Options struct {
     PrintVersion   bool   `                      long:"version"                                          description:"display version and exit"`
 }
 
-func sendHealthResults(riemann RiemannClient, healthResults []consulapi.HealthCheck, updateInterval time.Duration, nodeName, dc string) error {
+func sendHealthResults(riemann RiemannClient, healthResults []HealthCheck, updateInterval time.Duration, nodeName, dc string) error {
     for _, healthCheck := range healthResults {
         // {
         //   "Name": "Service 'client-youngaustria' check",
@@ -54,13 +54,17 @@ func sendHealthResults(riemann RiemannClient, healthResults []consulapi.HealthCh
             "critical": "critical",
         }[healthCheck.Status]
         
+        // there may be multiple services with the same name on a given host;
+        // these must have different serviceIds. there are also checks that
+        // aren't associated with a specific service.  service-specific checks
+        // have an id of "service:<serviceId>".
         evt := &raidman.Event{
             Ttl:         eventTtl,
             Time:        time.Now().Unix(),
-            Tags:        append([]string{ "consul" }),
+            Tags:        append(healthCheck.Tags, "consul"),
             Host:        healthCheck.Node,
             State:       state,
-            Service:     healthCheck.CheckID, // @todo CheckID or ServiceID?
+            Service:     healthCheck.CheckID,
             Description: healthCheck.Output,
             Attributes:  map[string]string{
                 "reporting_node": nodeName,
@@ -92,7 +96,7 @@ func mainLoop(
     var lockWatchChan chan interface{}
     
     // receives HealthCheck results
-    var healthResultsChan chan []consulapi.HealthCheck
+    var healthResultsChan chan []HealthCheck
 
     // the riemann client
     var riemann RiemannClient
@@ -132,7 +136,7 @@ func mainLoop(
                     go lockWatcher.WatchLock(lockWatchChan)
                     
                     // start retrieving health results
-                    healthResultsChan = make(chan []consulapi.HealthCheck)
+                    healthResultsChan = make(chan []HealthCheck)
                     go healthChecker.WatchHealthResults(healthResultsChan)
                 }
             } else {
@@ -254,7 +258,7 @@ func main() {
     
     checkError("unable to initialize consul receiver", err)
     
-    healthChecker := NewHealthChecker(consul.Health(), updateInterval)
+    healthChecker := NewHealthChecker(consul.Health(), consul.Catalog(), updateInterval)
     
     err = lockWatcher.RegisterService()
     checkError("unable to register service", err)

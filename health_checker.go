@@ -7,24 +7,49 @@ import (
     "github.com/armon/consul-api"
 )
 
+type HealthCheck struct {
+    // *consulapi.HealthCheck // <- why isn't that working?
+    Node        string
+    CheckID     string
+    Name        string
+    Status      string
+    Notes       string
+    Output      string
+    ServiceID   string
+    ServiceName string
+    Tags        []string
+}
+
+type nodeServiceKey struct {
+    Node      string
+    ServiceID string
+}
+
 type HealthChecker struct {
     health         ConsulHealth
+    catalog        ConsulCatalog
     updateInterval time.Duration
 }
 
-func NewHealthChecker(health ConsulHealth, updateInterval time.Duration) *HealthChecker {
+func NewHealthChecker(health ConsulHealth, catalog ConsulCatalog, updateInterval time.Duration) *HealthChecker {
     return &HealthChecker{
         health: health,
+        catalog: catalog,
         updateInterval: updateInterval,
     }
 }
 
-func (self *HealthChecker) WatchHealthResults(resultsChan chan []consulapi.HealthCheck) {
+func (self *HealthChecker) WatchHealthResults(resultsChan chan []HealthCheck) {
     waitIdx := uint64(0)
     keepWatching := true
     
     for keepWatching {
         log.Debugf("retrieving health results; WaitIndex=%d", waitIdx)
+        
+        // maintain map of node/serviceId to CatalogService details.  reset each
+        // time we refresh the health checks.  this is to ensure the service
+        // tags coincide with the services we're reporting on.
+        serviceDetails := make(map[nodeServiceKey]*consulapi.CatalogService)
 
         healthChecks, queryMeta, err := self.health.State("any", &consulapi.QueryOptions{
             WaitIndex: waitIdx,
@@ -38,9 +63,33 @@ func (self *HealthChecker) WatchHealthResults(resultsChan chan []consulapi.Healt
         
         waitIdx = queryMeta.LastIndex
         
-        var results []consulapi.HealthCheck
+        var results []HealthCheck
         for _, hc := range healthChecks {
-            results = append(results, *hc)
+            result := HealthCheck{
+                Node:        hc.Node,
+                CheckID:     hc.CheckID,
+                Name:        hc.Name,
+                Status:      hc.Status,
+                Notes:       hc.Notes,
+                Output:      hc.Output,
+                ServiceID:   hc.ServiceID,
+                ServiceName: hc.ServiceName,
+            }
+            
+            if hc.ServiceID != "" {
+                if _, ok := serviceDetails[nodeServiceKey{hc.Node, hc.ServiceID}]; ! ok {
+                    // retrieve the service details; don't already have them
+                    svcDetails, _, _ := self.catalog.Service(hc.ServiceName, "", nil)
+                    
+                    for _, svcDetail := range svcDetails {
+                        serviceDetails[nodeServiceKey{svcDetail.Node, svcDetail.ServiceID}] = svcDetail
+                    }
+                }
+                
+                result.Tags = serviceDetails[nodeServiceKey{hc.Node, hc.ServiceID}].ServiceTags
+            }
+            
+            results = append(results, result)
         }
         
         log.Debug("sending health results")

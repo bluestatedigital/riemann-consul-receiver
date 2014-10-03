@@ -32,3 +32,7 @@ type ConsulKV interface {
 type ConsulHealth interface {
     State(state string, q *consulapi.QueryOptions) ([]*consulapi.HealthCheck, *consulapi.QueryMeta, error)
 }
+
+type ConsulCatalog interface {
+    Service(service, tag string, q *consulapi.QueryOptions) ([]*consulapi.CatalogService, *consulapi.QueryMeta, error)
+}

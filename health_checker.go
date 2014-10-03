@@ -79,7 +79,13 @@ func (self *HealthChecker) WatchHealthResults(resultsChan chan []HealthCheck) {
             if hc.ServiceID != "" {
                 if _, ok := serviceDetails[nodeServiceKey{hc.Node, hc.ServiceID}]; ! ok {
                     // retrieve the service details; don't already have them
-                    svcDetails, _, _ := self.catalog.Service(hc.ServiceName, "", nil)
+                    svcDetails, _, err := self.catalog.Service(hc.ServiceName, "", nil)
+                    
+                    if err != nil {
+                        log.Errorf("error retrieving services: %v", err)
+                        keepWatching = false
+                        break
+                    }
                     
                     for _, svcDetail := range svcDetails {
                         serviceDetails[nodeServiceKey{svcDetail.Node, svcDetail.ServiceID}] = svcDetail
@@ -92,15 +98,17 @@ func (self *HealthChecker) WatchHealthResults(resultsChan chan []HealthCheck) {
             results = append(results, result)
         }
         
-        log.Debug("sending health results")
-        select {
-            case resultsChan <- results:
-                // successfully sent results
-            
-            case <-resultsChan:
-                // any value, but probably nil
-                // break out of loop, which will then close the channel
-                keepWatching = false
+        if keepWatching {
+            log.Debug("sending health results")
+            select {
+                case resultsChan <- results:
+                    // successfully sent results
+                
+                case <-resultsChan:
+                    // any value, but probably nil
+                    // break out of loop, which will then close the channel
+                    keepWatching = false
+            }
         }
     }
     

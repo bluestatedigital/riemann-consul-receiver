@@ -131,6 +131,8 @@ func mainLoop(
                     lockWatcher.ReleaseLock()
                     haveLock = false
                 } else {
+                    log.Info("connected")
+
                     // get notified when we lose our lock
                     lockWatchChan = make(chan interface{})
                     go lockWatcher.WatchLock(lockWatchChan)

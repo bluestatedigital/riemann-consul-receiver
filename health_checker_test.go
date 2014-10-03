@@ -2,6 +2,7 @@ package main
 
 import (
     "time"
+    "errors"
     
     "github.com/stretchr/testify/mock"
     "github.com/armon/consul-api"
@@ -180,5 +181,50 @@ var _ = Describe("health checker", func() {
 
         // test's done *bing!*
         close(done)
+    })
+
+    It("stops polling if an error happens retrieving services", func(done Done) {
+        mockHealth.On("State", "any", genericQueryOpts).Return(
+            []*consulapi.HealthCheck{
+                &consulapi.HealthCheck{
+                    Node:        nodeName,
+                    CheckID:     "service:" + serviceName,
+                    Name:        "Health check for '" + serviceName + "' service",
+                    Status:      "passing",
+                    Notes:       "'s good, yo",
+                    Output:      "some check result output",
+                    ServiceID:   serviceName + "0",
+                    ServiceName: serviceName,
+                },
+            },
+            &consulapi.QueryMeta{
+                LastIndex: 10,
+            },
+            nil,
+        ).Once()
+
+        mockCatalog.On("Service", serviceName, "", genericQueryOpts).Return(
+            nil,
+            nil,
+            errors.New("some error"),
+        ).Once()
+
+        // channel for receiving results
+        c := make(chan []HealthCheck)
+        
+        // start polling
+        go healthChecker.WatchHealthResults(c)
+        
+        // read first set of results.  sender blocks until written, we block
+        // until read.
+        _, more := <-c
+        Expect(more).To(Equal(false))
+        
+        mockHealth.AssertExpectations(GinkgoT())
+        mockCatalog.AssertExpectations(GinkgoT())
+
+        // test's done *bing!*
+        close(done)
+
     })
 })

@@ -12,9 +12,18 @@ type MockCatalog struct {
 func (m *MockCatalog) Service(service, tag string, q *consulapi.QueryOptions) ([]*consulapi.CatalogService, *consulapi.QueryMeta, error) {
     ret := m.Called(service, tag, q)
 
-    r0 := ret.Get(0).([]*consulapi.CatalogService)
-    r1 := ret.Get(1).(*consulapi.QueryMeta)
+    var svcs []*consulapi.CatalogService = nil
+    var qm *consulapi.QueryMeta = nil
+    
+    if ret.Get(0) != nil {
+        svcs = ret.Get(0).([]*consulapi.CatalogService)
+    }
+    
+    if ret.Get(1) != nil {
+        qm = ret.Get(1).(*consulapi.QueryMeta)
+    }
+
     r2 := ret.Error(2)
 
-    return r0, r1, r2
+    return svcs, qm, r2
 }

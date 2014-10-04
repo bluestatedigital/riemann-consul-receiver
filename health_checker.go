@@ -61,7 +61,10 @@ func (self *HealthChecker) WatchHealthResults(resultsChan chan []HealthCheck) {
             break
         }
         
+        // LastIndex used for blocking query
         waitIdx = queryMeta.LastIndex
+        
+        log.Debug("handling health check results")
         
         var results []HealthCheck
         for _, hc := range healthChecks {
@@ -82,22 +85,28 @@ func (self *HealthChecker) WatchHealthResults(resultsChan chan []HealthCheck) {
                     svcDetails, _, err := self.catalog.Service(hc.ServiceName, "", nil)
                     
                     if err != nil {
+                        // break out of the HealthCheck iteration loop if an
+                        // error occurs retrieving the services
                         log.Errorf("error retrieving services: %v", err)
                         keepWatching = false
                         break
                     }
                     
+                    // store service details in map
                     for _, svcDetail := range svcDetails {
                         serviceDetails[nodeServiceKey{svcDetail.Node, svcDetail.ServiceID}] = svcDetail
                     }
                 }
                 
+                // set the HealthCheck's Tags to the service's tags
                 result.Tags = serviceDetails[nodeServiceKey{hc.Node, hc.ServiceID}].ServiceTags
             }
             
             results = append(results, result)
         }
         
+        // keepWatching might have been set to false if an error occurred
+        // retrieving the services
         if keepWatching {
             log.Debug("sending health results")
             select {

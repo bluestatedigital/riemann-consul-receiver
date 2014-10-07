@@ -91,7 +91,15 @@ func mainLoop(
     updateInterval time.Duration,
     nodeName       string,
     dc             string,
+    done           chan<- interface{},
 ) {
+    // indicate to caller when this routine is done; just close channel so the
+    // write doesn't block
+    defer func() { close(done) }()
+    
+    // (attempt to) capture stack trace on a panic
+    defer recoverAndLog("mainLoop")
+    
     // used to notify when lock has been lost; it'll just get closed
     var lockWatchChan chan interface{}
     
@@ -275,10 +283,15 @@ func main() {
     // use syscall signals because os only provides Interrupt and Kill
     signalChan := make(chan os.Signal)
     signal.Notify(signalChan, syscall.SIGINT, syscall.SIGTERM)
-    
+
     log.Debug("starting main loop")
-    go mainLoop(lockWatcher, healthChecker, opts.RiemannHost, opts.RiemannPort, opts.Proto, updateInterval, nodeName, dc)
+
+    done := make(chan interface{})
+    go mainLoop(lockWatcher, healthChecker, opts.RiemannHost, opts.RiemannPort, opts.Proto, updateInterval, nodeName, dc, done)
     
-    // Block until a signal is received.
-    <-signalChan
+    // Block until a signal is received or mainLoop crashes
+    select {
+        case <-signalChan:
+        case <-done:
+    }
 }

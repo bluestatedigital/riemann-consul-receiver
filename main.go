@@ -169,7 +169,7 @@ func mainLoop(
                     
                     haveLock = false
                     
-                    close(healthResultsAbort)
+                    healthResultsAbort <- nil
                     healthResultsAbort = nil
                     log.Debug("commanded health results watcher to stop")
                     

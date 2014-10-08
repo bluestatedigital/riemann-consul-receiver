@@ -83,7 +83,7 @@ var _ = Describe("health checker", func() {
         Expect(more).To(Equal(true))
         
         // now tell it to stop
-        close(d)
+        d <- nil
         
         // read from the channel again; should be closed
         _, more = <-c
@@ -176,7 +176,7 @@ var _ = Describe("health checker", func() {
         Expect(results[0].Tags).To(ContainElement("tag2"))
         
         // now close the channel
-        close(d)
+        d <- nil
         
         // read from the channel again; should be closed
         _, more = <-c

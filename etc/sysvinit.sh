@@ -62,10 +62,13 @@ start() {
     ## go can't be properly daemonized.  we need the pid of the spawned process,
     ## which is actually done via runuser thanks to --user.
     ## you can't do "cmd &; action" but you can do "{cmd &}; action".
+    ##
+    ## riemann-consul-receiver will not write to stdout except in the case of a
+    ## runtime panic
     daemon \
         --pidfile=$pidfile \
         --user=$user \
-        " { $exec & } ; echo \$! >| $pidfile "
+        " { $exec > $logfile 2>&1 & } ; echo \$! >| $pidfile "
     
     RETVAL=$?
     

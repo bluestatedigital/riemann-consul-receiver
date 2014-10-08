@@ -74,9 +74,6 @@ start() {
     
     if [ $RETVAL -eq 0 ]; then
         touch $lockfile
-        success
-    else
-        failure
     fi
     
     echo    
@@ -90,10 +87,7 @@ stop() {
     RETVAL=$?
 
     if [ $RETVAL -eq 0 ]; then
-        success
         rm -f $lockfile $pidfile
-    else
-        failure
     fi
 
     echo

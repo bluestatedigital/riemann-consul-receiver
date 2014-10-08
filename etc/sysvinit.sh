@@ -84,9 +84,9 @@ start() {
 }
 
 stop() {
-    echo -n $"Stopping $name: "
+    echo -n $"Stopping $prog: "
     
-    killproc -p $pidfile $name
+    killproc -p $pidfile $prog
     RETVAL=$?
 
     if [ $RETVAL -eq 0 ]; then

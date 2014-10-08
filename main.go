@@ -105,6 +105,9 @@ func mainLoop(
     
     // receives HealthCheck results
     var healthResultsChan chan []HealthCheck
+    
+    // control channel for the health results checker
+    var healthResultsAbort chan interface{}
 
     // the riemann client
     var riemann RiemannClient
@@ -147,7 +150,8 @@ func mainLoop(
                     
                     // start retrieving health results
                     healthResultsChan = make(chan []HealthCheck)
-                    go healthChecker.WatchHealthResults(healthResultsChan)
+                    healthResultsAbort = make(chan interface{})
+                    go healthChecker.WatchHealthResults(healthResultsChan, healthResultsAbort)
                 }
             } else {
                 log.Debug("could not acquire lock")
@@ -165,10 +169,9 @@ func mainLoop(
                     
                     haveLock = false
                     
-                    // this could take some time
-                    healthResultsChan <- nil
-                    healthResultsChan = nil
-                    log.Debug("closed health results channel")
+                    close(healthResultsAbort)
+                    healthResultsAbort = nil
+                    log.Debug("commanded health results watcher to stop")
                     
                     lockWatchChan = nil
                     

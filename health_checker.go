@@ -39,7 +39,7 @@ func NewHealthChecker(health ConsulHealth, catalog ConsulCatalog, updateInterval
     }
 }
 
-func (self *HealthChecker) WatchHealthResults(resultsChan chan []HealthCheck) {
+func (self *HealthChecker) WatchHealthResults(resultsChan chan<- []HealthCheck, done <-chan interface{}) {
     waitIdx := uint64(0)
     keepWatching := true
     
@@ -113,9 +113,8 @@ func (self *HealthChecker) WatchHealthResults(resultsChan chan []HealthCheck) {
                 case resultsChan <- results:
                     // successfully sent results
                 
-                case <-resultsChan:
-                    // any value, but probably nil
-                    // break out of loop, which will then close the channel
+                case <-done:
+                    // channel's closed when we've been told to stop
                     keepWatching = false
             }
         }

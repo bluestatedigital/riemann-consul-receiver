@@ -70,8 +70,11 @@ var _ = Describe("health checker", func() {
         // channel for receiving results
         c := make(chan []HealthCheck)
         
+        // channel for terminating processing
+        d := make(chan interface{})
+        
         // start polling
-        go healthChecker.WatchHealthResults(c)
+        go healthChecker.WatchHealthResults(c, d)
         
         // read first set of results.  sender blocks until written, we block
         // until read.
@@ -79,8 +82,8 @@ var _ = Describe("health checker", func() {
         Expect(len(results)).To(Equal(1))
         Expect(more).To(Equal(true))
         
-        // now close the channel
-        c <- nil
+        // now tell it to stop
+        close(d)
         
         // read from the channel again; should be closed
         _, more = <-c
@@ -151,8 +154,11 @@ var _ = Describe("health checker", func() {
         // channel for receiving results
         c := make(chan []HealthCheck)
         
+        // channel for terminating processing
+        d := make(chan interface{})
+        
         // start polling
-        go healthChecker.WatchHealthResults(c)
+        go healthChecker.WatchHealthResults(c, d)
         
         // read first set of results.  sender blocks until written, we block
         // until read.
@@ -170,7 +176,7 @@ var _ = Describe("health checker", func() {
         Expect(results[0].Tags).To(ContainElement("tag2"))
         
         // now close the channel
-        c <- nil
+        close(d)
         
         // read from the channel again; should be closed
         _, more = <-c
@@ -212,8 +218,11 @@ var _ = Describe("health checker", func() {
         // channel for receiving results
         c := make(chan []HealthCheck)
         
+        // channel for terminating processing
+        d := make(chan interface{})
+        
         // start polling
-        go healthChecker.WatchHealthResults(c)
+        go healthChecker.WatchHealthResults(c, d)
         
         // read first set of results.  sender blocks until written, we block
         // until read.

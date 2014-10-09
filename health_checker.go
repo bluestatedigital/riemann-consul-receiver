@@ -80,7 +80,7 @@ func (self *HealthChecker) WatchHealthResults(resultsChan chan<- []HealthCheck, 
             }
             
             if hc.ServiceID != "" {
-                if _, ok := serviceDetails[nodeServiceKey{hc.Node, hc.ServiceID}]; ! ok {
+                if _, exists := serviceDetails[nodeServiceKey{hc.Node, hc.ServiceID}]; ! exists {
                     // retrieve the service details; don't already have them
                     svcDetails, _, err := self.catalog.Service(hc.ServiceName, "", nil)
                     
@@ -99,7 +99,11 @@ func (self *HealthChecker) WatchHealthResults(resultsChan chan<- []HealthCheck, 
                 }
                 
                 // set the HealthCheck's Tags to the service's tags
-                result.Tags = serviceDetails[nodeServiceKey{hc.Node, hc.ServiceID}].ServiceTags
+                if svcDetail, exists := serviceDetails[nodeServiceKey{hc.Node, hc.ServiceID}]; exists {
+                    result.Tags = svcDetail.ServiceTags
+                } else {
+                    log.Errorf("no service details found for %s, %s", hc.Node, hc.ServiceID)
+                }
             }
             
             results = append(results, result)

@@ -48,8 +48,10 @@ func (self *HealthChecker) WatchHealthResults(resultsChan chan<- []HealthCheck, 
         
         // maintain map of node/serviceId to CatalogService details.  reset each
         // time we refresh the health checks.  this is to ensure the service
-        // tags coincide with the services we're reporting on.
-        serviceDetails := make(map[nodeServiceKey]*consulapi.CatalogService)
+        // tags coincide with the services we're reporting on.  this map's
+        // messy, but it ensures that we only retrieve service details once per
+        // service.
+        serviceDetails := make(map[string]map[nodeServiceKey]*consulapi.CatalogService)
 
         healthChecks, queryMeta, err := self.health.State("any", &consulapi.QueryOptions{
             WaitIndex: waitIdx,
@@ -80,7 +82,7 @@ func (self *HealthChecker) WatchHealthResults(resultsChan chan<- []HealthCheck, 
             }
             
             if hc.ServiceID != "" {
-                if _, exists := serviceDetails[nodeServiceKey{hc.Node, hc.ServiceID}]; ! exists {
+                if _, exists := serviceDetails[hc.ServiceName]; ! exists {
                     // retrieve the service details; don't already have them
                     svcDetails, _, err := self.catalog.Service(hc.ServiceName, "", nil)
                     
@@ -93,16 +95,21 @@ func (self *HealthChecker) WatchHealthResults(resultsChan chan<- []HealthCheck, 
                     }
                     
                     // store service details in map
+                    serviceDetails[hc.ServiceName] = make(map[nodeServiceKey]*consulapi.CatalogService)
                     for _, svcDetail := range svcDetails {
-                        serviceDetails[nodeServiceKey{svcDetail.Node, svcDetail.ServiceID}] = svcDetail
+                        serviceDetails[hc.ServiceName][nodeServiceKey{svcDetail.Node, svcDetail.ServiceID}] = svcDetail
                     }
                 }
                 
                 // set the HealthCheck's Tags to the service's tags
-                if svcDetail, exists := serviceDetails[nodeServiceKey{hc.Node, hc.ServiceID}]; exists {
-                    result.Tags = svcDetail.ServiceTags
+                if _, exists := serviceDetails[hc.ServiceName]; exists {
+                    if svcDetail, exists := serviceDetails[hc.ServiceName][nodeServiceKey{hc.Node, hc.ServiceID}]; exists {
+                        result.Tags = svcDetail.ServiceTags
+                    } else {
+                        log.Errorf("no service details found for %s, %s", hc.Node, hc.ServiceID)
+                    }
                 } else {
-                    log.Errorf("no service details found for %s, %s", hc.Node, hc.ServiceID)
+                    log.Errorf("service %s not found for %s, %s", hc.ServiceName, hc.Node, hc.ServiceID)
                 }
             }
             

@@ -242,7 +242,7 @@ var _ = Describe("health checker", func() {
             },
             new(consulapi.QueryMeta),
             nil,
-        ).Times(4) // <- too many!
+        ).Twice()
         
         // channel for receiving results
         c := make(chan []HealthCheck)

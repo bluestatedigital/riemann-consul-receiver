@@ -68,7 +68,7 @@ start() {
     daemon \
         --pidfile=$pidfile \
         --user=$user \
-        " { $exec > $logfile 2>&1 & } ; echo \$! >| $pidfile "
+        " { $exec & } ; echo \$! >| $pidfile "
     
     RETVAL=$?
     

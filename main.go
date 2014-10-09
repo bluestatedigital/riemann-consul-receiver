@@ -236,6 +236,11 @@ func main() {
         
         defer logFp.Close()
         
+        // ensure panic output goes to log file
+        // https://code.google.com/p/go/issues/detail?id=325
+        syscall.Dup2(int(logFp.Fd()), 1)
+        syscall.Dup2(int(logFp.Fd()), 2)
+        
         // log as JSON
         log.SetFormatter(&log.JSONFormatter{})
         

@@ -67,14 +67,11 @@ var _ = Describe("health checker", func() {
             nil,
         ).Twice()
 
-        // channel for receiving results
-        c := make(chan []HealthCheck)
-        
         // channel for terminating processing
         d := make(chan interface{})
         
         // start polling
-        go healthChecker.WatchHealthResults(c, d)
+        c := healthChecker.WatchHealthResults(d)
         
         // read first set of results.  sender blocks until written, we block
         // until read.
@@ -151,14 +148,11 @@ var _ = Describe("health checker", func() {
             nil,
         ).Twice()
 
-        // channel for receiving results
-        c := make(chan []HealthCheck)
-        
         // channel for terminating processing
         d := make(chan interface{})
         
         // start polling
-        go healthChecker.WatchHealthResults(c, d)
+        c := healthChecker.WatchHealthResults(d)
         
         // read first set of results.  sender blocks until written, we block
         // until read.
@@ -244,14 +238,11 @@ var _ = Describe("health checker", func() {
             nil,
         ).Twice()
         
-        // channel for receiving results
-        c := make(chan []HealthCheck)
-        
         // channel for terminating processing
         d := make(chan interface{})
         
         // start polling
-        go healthChecker.WatchHealthResults(c, d)
+        c := healthChecker.WatchHealthResults(d)
         
         // read first set of results.  sender blocks until written, we block
         // until read.
@@ -300,14 +291,11 @@ var _ = Describe("health checker", func() {
             errors.New("some error"),
         ).Once()
 
-        // channel for receiving results
-        c := make(chan []HealthCheck)
-        
         // channel for terminating processing
         d := make(chan interface{})
         
         // start polling
-        go healthChecker.WatchHealthResults(c, d)
+        c := healthChecker.WatchHealthResults(d)
         
         // read first set of results.  sender blocks until written, we block
         // until read.

@@ -422,9 +422,7 @@ var _ = Describe("LockWatcher", func() {
 
             // channel used to notify when lock has been lost; it'll just get
             // closed
-            c := make(chan interface{}, 0)
-            
-            go receiver.WatchLock(c)
+            c := receiver.WatchLock()
             
             // wait for the lock to be lost
             select {
@@ -465,9 +463,7 @@ var _ = Describe("LockWatcher", func() {
 
             // channel used to notify when lock has been lost; it'll just get
             // closed
-            c := make(chan interface{}, 0)
-            
-            go receiver.WatchLock(c)
+            c := receiver.WatchLock()
             
             // wait for the lock to be lost
             select {

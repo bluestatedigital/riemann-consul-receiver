@@ -101,10 +101,10 @@ func mainLoop(
     defer recoverAndLog("mainLoop")
     
     // used to notify when lock has been lost; it'll just get closed
-    var lockWatchChan chan interface{}
+    var lockWatchChan <-chan interface{}
     
     // receives HealthCheck results
-    var healthResultsChan chan []HealthCheck
+    var healthResultsChan <-chan []HealthCheck
     
     // control channel for the health results checker
     var healthResultsAbort chan interface{}
@@ -145,13 +145,11 @@ func mainLoop(
                     log.Info("connected")
 
                     // get notified when we lose our lock
-                    lockWatchChan = make(chan interface{})
-                    go lockWatcher.WatchLock(lockWatchChan)
+                    lockWatchChan = lockWatcher.WatchLock()
                     
                     // start retrieving health results
-                    healthResultsChan = make(chan []HealthCheck)
                     healthResultsAbort = make(chan interface{})
-                    go healthChecker.WatchHealthResults(healthResultsChan, healthResultsAbort)
+                    healthResultsChan = healthChecker.WatchHealthResults(healthResultsAbort)
                 }
             } else {
                 log.Debug("could not acquire lock")

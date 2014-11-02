@@ -184,25 +184,30 @@ func (self *LockWatcher) AcquireLock() (bool, error) {
     return lockedByUs, err
 }
 
-func (self *LockWatcher) WatchLock(watchChan chan<- interface{}) {
+func (self *LockWatcher) WatchLock() <-chan interface{} {
+    watchChan := make(chan interface{})
     lockedByUs := true
     
-    for lockedByUs {
-        kvp, queryMeta, err := self.kv.Get(self.keyPath, &consulapi.QueryOptions{
-            WaitIndex: self.keyModifyIdx,
-            WaitTime: time.Minute,
-        })
-        
-        if err == nil {
-            isLocked := (kvp != nil) && (kvp.Session != "")
-            lockedByUs = isLocked && (kvp.Session == self.sessionID)
-            self.keyModifyIdx = queryMeta.LastIndex
-        } else {
-            log.Errorf("unable to check key: %v", err)
+    go func() {
+        for lockedByUs {
+            kvp, queryMeta, err := self.kv.Get(self.keyPath, &consulapi.QueryOptions{
+                WaitIndex: self.keyModifyIdx,
+                WaitTime: time.Minute,
+            })
+            
+            if err == nil {
+                isLocked := (kvp != nil) && (kvp.Session != "")
+                lockedByUs = isLocked && (kvp.Session == self.sessionID)
+                self.keyModifyIdx = queryMeta.LastIndex
+            } else {
+                log.Errorf("unable to check key: %v", err)
+            }
         }
-    }
+        
+        close(watchChan)
+    }()
     
-    close(watchChan)
+    return watchChan
 }
 
 func (self *LockWatcher) ReleaseLock() error {

@@ -1,15 +1,20 @@
 NAME=riemann-consul-receiver
-## tags are like v1.0.0
-VER=$(shell git describe --always --dirty | sed -e 's/^v//g' )
-BIN=.godeps/bin
 
+## the go-get'able path
+PKG_PATH=github.com/bluestatedigital/$(NAME)
+
+## tags are like v1.0.0
+VER:=$(shell git describe --always --dirty | sed -e 's/^v//g' )
+
+BIN=.godeps/bin
 GPM=$(BIN)/gpm
 GPM_LINK=$(BIN)/gpm-link
 GVP=$(BIN)/gvp
 
 ## @todo should use "$(GVP) in", but that fails
-SOURCES=$(shell go list -f '{{range .GoFiles}}{{.}} {{end}}' . )
-TEST_SOURCES=$(shell go list -f '{{range .TestGoFiles}}{{ $$.Dir }}/{{.}} {{end}}' . | sed -e "s@$(PWD)/@@g" )
+SOURCES:=$(shell go list -f '{{range .GoFiles}}{{ $$.Dir }}/{{.}} {{end}}' ./... | sed -e "s@$(PWD)/@@g" )
+TEST_SOURCES:=$(shell go list -f '{{range .TestGoFiles}}{{ $$.Dir }}/{{.}} {{end}}' ./... | sed -e "s@$(PWD)/@@g" )
+PACKAGES:=$(shell go list -f '{{.Name}}' ./... )
 
 .PHONY: all devtools deps test build clean rpm
 
@@ -34,7 +39,7 @@ $(GVP): | $(BIN)
 	chmod +x $@
 
 .godeps/.gpm_installed: $(GPM) $(GVP) $(GPM_LINK) Godeps
-	$(GVP) in $(GPM) link add github.com/bluestatedigital/riemann-consul-receiver $(PWD)
+	test -e .godeps/src/$(PKG_PATH) || $(GVP) in $(GPM) link add $(PKG_PATH) $(PWD)
 	$(GVP) in $(GPM) install
 	touch $@
 

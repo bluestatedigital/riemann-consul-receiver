@@ -6,7 +6,7 @@ import (
     
     "github.com/stretchr/testify/mock"
     "github.com/armon/consul-api"
-    "github.com/bluestatedigital/riemann-consul-receiver/consul-mocks"
+    "./consul-mocks"
 )
 
 var _ = Describe("health checker", func() {

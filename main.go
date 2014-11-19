@@ -69,6 +69,8 @@ func sendHealthResults(riemann RiemannClient, healthResults []HealthCheck, updat
             Attributes:  map[string]string{
                 "reporting_node": nodeName,
                 "datacenter":     dc,
+                "service_name":   healthCheck.ServiceName,
+                "service_id":     healthCheck.ServiceID,
             },
         }
         

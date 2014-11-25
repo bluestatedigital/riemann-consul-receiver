@@ -54,6 +54,7 @@ func (self *HealthChecker) WatchHealthResults(done <-chan interface{}) <-chan []
             // tags coincide with the services we're reporting on.  this map's
             // messy, but it ensures that we only retrieve service details once per
             // service.
+            // refactor when https://github.com/hashicorp/consul/issues/377 lands
             serviceDetails := make(map[string]map[nodeServiceKey]*consulapi.CatalogService)
 
             healthChecks, queryMeta, err := self.health.State("any", &consulapi.QueryOptions{

@@ -1,7 +1,7 @@
 package main
 
 import (
-	"time"
+    "time"
 
     "github.com/stretchr/testify/mock"
     "github.com/armon/consul-api"

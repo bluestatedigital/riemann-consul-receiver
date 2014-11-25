@@ -307,6 +307,5 @@ var _ = Describe("health checker", func() {
 
         // test's done *bing!*
         close(done)
-
     })
 })

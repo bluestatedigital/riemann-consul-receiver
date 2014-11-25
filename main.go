@@ -168,9 +168,15 @@ func mainLoop(
                     
                     haveLock = false
                     
-                    healthResultsAbort <- nil
-                    healthResultsAbort = nil
-                    log.Debug("commanded health results watcher to stop")
+                    // healthResultsAbort set to nil when closed; don't write to
+                    // a closed channel!
+                    if healthResultsAbort != nil {
+                        healthResultsAbort <- nil
+                        log.Debug("commanded health results watcher to stop")
+                        
+                        close(healthResultsAbort)
+                        healthResultsAbort = nil
+                    }
                     
                     lockWatchChan = nil
                     
@@ -178,8 +184,10 @@ func mainLoop(
                     riemann = nil
                 
                 case healthResults, more := <-healthResultsChan:
-                    // channel closed if there was an error retrieving the health
-                    // results. also check that we still have the lock, as the
+                    // channel closed if there was an error retrieving the
+                    // health results, or if the health checker has been
+                    // commanded to stop by closing the healthResultsAbort
+                    // channel. also check that we still have the lock, as the
                     // health results channel could still have results.
                     log.Debug("got health results")
 
@@ -194,6 +202,16 @@ func mainLoop(
                         }
                     } else {
                         // lost lock or error occurred retrieving health results
+
+                        if ! more {
+                            log.Info("health checker has stopped")
+                            
+                            // healthResultsAbort is no longer being read by the
+                            // health checker.
+                            close(healthResultsAbort)
+                            healthResultsAbort = nil
+                        }
+
                         lockWatcher.ReleaseLock()
                     }
 

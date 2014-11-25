@@ -1,7 +1,7 @@
 ## prod
 github.com/armon/consul-api  0e644b80dc2054cd4edbfa7a273b87f37fc120a1
 github.com/jessevdk/go-flags 37e89eb6730ccfebfa05c17940954e4308719317
-github.com/Sirupsen/logrus   89b6d460f0048bd1591d723b483f89b127257dbb
+github.com/Sirupsen/logrus   f9e0c0dd4aec8f179cb6dc4f2aea811f36b58f54
 github.com/amir/raidman      e5c0381f4e85217ed2e4fdee2d8d8c5f8e101c0e
 
 ## test

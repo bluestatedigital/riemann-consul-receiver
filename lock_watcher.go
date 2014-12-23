@@ -154,7 +154,7 @@ func (self *LockWatcher) AcquireLock() (bool, error) {
     sessionEntry, _, err := self.session.Info(self.sessionID, nil)
     
     if err != nil {
-        return false, err
+        return false, fmt.Errorf("unable to retrieve session info: %v", err)
     }
 
     if sessionEntry == nil {
@@ -167,7 +167,7 @@ func (self *LockWatcher) AcquireLock() (bool, error) {
     })
     
     if err != nil {
-        return false, err
+        return false, fmt.Errorf("unable to retrieve key %s: %v", self.keyPath, err)
     }
     
     isLocked := (kvp != nil) && (kvp.Session != "")
@@ -179,6 +179,10 @@ func (self *LockWatcher) AcquireLock() (bool, error) {
             Key: self.keyPath,
             Session: self.sessionID,
         }, nil)
+    }
+    
+    if err != nil {
+        err = fmt.Errorf("unable to acquire lock: %v", err)
     }
     
     return lockedByUs, err

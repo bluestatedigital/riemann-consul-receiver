@@ -149,15 +149,21 @@ func (self *LockWatcher) UpdateHealthCheck() error {
     return self.agent.PassTTL("service:" + self.serviceName, "")
 }
 
+// attempt to acquire lock.  returns true if lock acquired, false otherwise.
 func (self *LockWatcher) AcquireLock() (bool, error) {
     // verify session's still valid
     sessionEntry, _, err := self.session.Info(self.sessionID, nil)
     
     if err != nil {
-        return false, fmt.Errorf("unable to retrieve session info: %v", err)
+        // can just log and return false here; an error is is probably the
+        // cluster not having a leader
+        
+        log.Error("error retrieving session info: %v", err)
+        return false, nil
     }
 
     if sessionEntry == nil {
+        // this is an actual error!
         return false, fmt.Errorf("session %s is no longer valid", self.sessionID)
     }
     
@@ -167,7 +173,11 @@ func (self *LockWatcher) AcquireLock() (bool, error) {
     })
     
     if err != nil {
-        return false, fmt.Errorf("unable to retrieve key %s: %v", self.keyPath, err)
+        // can just log and return false here; an error is is probably the
+        // cluster not having a leader
+
+        log.Error("unable to retrieve key %s: %v", self.keyPath, err)        
+        return false, nil
     }
     
     isLocked := (kvp != nil) && (kvp.Session != "")
@@ -179,10 +189,14 @@ func (self *LockWatcher) AcquireLock() (bool, error) {
             Key: self.keyPath,
             Session: self.sessionID,
         }, nil)
-    }
-    
-    if err != nil {
-        err = fmt.Errorf("unable to acquire lock: %v", err)
+        
+        if err != nil {
+            // can just log and return false here; an error is is probably the
+            // cluster not having a leader
+            
+            log.Error("unable to acquire lock: %v", err)
+            return false, nil
+        }
     }
     
     return lockedByUs, err

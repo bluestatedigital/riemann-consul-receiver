@@ -206,10 +206,12 @@ func mainLoop(
                         if ! more {
                             log.Info("health checker has stopped")
                             
-                            // healthResultsAbort is no longer being read by the
-                            // health checker.
-                            close(healthResultsAbort)
-                            healthResultsAbort = nil
+                            if healthResultsAbort != nil {
+                                // healthResultsAbort is no longer being read by
+                                // the health checker.
+                                close(healthResultsAbort)
+                                healthResultsAbort = nil
+                            }
                         }
 
                         lockWatcher.ReleaseLock()

@@ -158,7 +158,7 @@ func (self *LockWatcher) AcquireLock() (bool, error) {
         // can just log and return false here; an error is is probably the
         // cluster not having a leader
         
-        log.Error("error retrieving session info: %v", err)
+        log.Errorf("error retrieving session info: %v", err)
         return false, nil
     }
 
@@ -176,7 +176,7 @@ func (self *LockWatcher) AcquireLock() (bool, error) {
         // can just log and return false here; an error is is probably the
         // cluster not having a leader
 
-        log.Error("unable to retrieve key %s: %v", self.keyPath, err)        
+        log.Errorf("unable to retrieve key %s: %v", self.keyPath, err)        
         return false, nil
     }
     
@@ -194,7 +194,7 @@ func (self *LockWatcher) AcquireLock() (bool, error) {
             // can just log and return false here; an error is is probably the
             // cluster not having a leader
             
-            log.Error("unable to acquire lock: %v", err)
+            log.Errorf("unable to acquire lock: %v", err)
             return false, nil
         }
     }

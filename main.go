@@ -6,6 +6,7 @@ import (
     "syscall"
     "fmt"
     "time"
+    "net/http"
     
     log "github.com/Sirupsen/logrus"
     flags "github.com/jessevdk/go-flags"
@@ -267,8 +268,18 @@ func main() {
         log.SetOutput(logFp)
     }
     
-    // connect to Consul
-    consulConfig := consulapi.DefaultConfig()
+    // connect to Consul; like the default client, but with a timeout for http
+    // requests tied to the update interval.  Shouldn't be necessary, but I've
+    // seen a couple of instances where it appears there's a hang waiting for a
+    // response to come (for, like, hours).
+    consulConfig := &consulapi.Config{
+        Address:    "127.0.0.1:8500",
+        Scheme:     "http",
+        HttpClient: &http.Client{
+            Timeout: updateInterval * 3,
+        },
+    }
+    
     consulConfig.Address = fmt.Sprintf("%s:%d", opts.ConsulHost, opts.ConsulPort)
     log.Infof("connecting to Consul at %s", consulConfig.Address)
 

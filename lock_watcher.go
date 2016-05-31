@@ -149,15 +149,21 @@ func (self *LockWatcher) UpdateHealthCheck() error {
     return self.agent.PassTTL("service:" + self.serviceName, "")
 }
 
+// attempt to acquire lock.  returns true if lock acquired, false otherwise.
 func (self *LockWatcher) AcquireLock() (bool, error) {
     // verify session's still valid
     sessionEntry, _, err := self.session.Info(self.sessionID, nil)
     
     if err != nil {
-        return false, err
+        // can just log and return false here; an error is is probably the
+        // cluster not having a leader
+        
+        log.Errorf("error retrieving session info: %v", err)
+        return false, nil
     }
 
     if sessionEntry == nil {
+        // this is an actual error!
         return false, fmt.Errorf("session %s is no longer valid", self.sessionID)
     }
     
@@ -167,7 +173,11 @@ func (self *LockWatcher) AcquireLock() (bool, error) {
     })
     
     if err != nil {
-        return false, err
+        // can just log and return false here; an error is is probably the
+        // cluster not having a leader
+
+        log.Errorf("unable to retrieve key %s: %v", self.keyPath, err)        
+        return false, nil
     }
     
     isLocked := (kvp != nil) && (kvp.Session != "")
@@ -179,30 +189,43 @@ func (self *LockWatcher) AcquireLock() (bool, error) {
             Key: self.keyPath,
             Session: self.sessionID,
         }, nil)
+        
+        if err != nil {
+            // can just log and return false here; an error is is probably the
+            // cluster not having a leader
+            
+            log.Errorf("unable to acquire lock: %v", err)
+            return false, nil
+        }
     }
     
     return lockedByUs, err
 }
 
-func (self *LockWatcher) WatchLock(watchChan chan<- interface{}) {
+func (self *LockWatcher) WatchLock() <-chan interface{} {
+    watchChan := make(chan interface{})
     lockedByUs := true
     
-    for lockedByUs {
-        kvp, queryMeta, err := self.kv.Get(self.keyPath, &consulapi.QueryOptions{
-            WaitIndex: self.keyModifyIdx,
-            WaitTime: time.Minute,
-        })
-        
-        if err == nil {
-            isLocked := (kvp != nil) && (kvp.Session != "")
-            lockedByUs = isLocked && (kvp.Session == self.sessionID)
-            self.keyModifyIdx = queryMeta.LastIndex
-        } else {
-            log.Errorf("unable to check key: %v", err)
+    go func() {
+        for lockedByUs {
+            kvp, queryMeta, err := self.kv.Get(self.keyPath, &consulapi.QueryOptions{
+                WaitIndex: self.keyModifyIdx,
+                WaitTime: time.Minute,
+            })
+            
+            if err == nil {
+                isLocked := (kvp != nil) && (kvp.Session != "")
+                lockedByUs = isLocked && (kvp.Session == self.sessionID)
+                self.keyModifyIdx = queryMeta.LastIndex
+            } else {
+                log.Errorf("unable to check key: %v", err)
+            }
         }
-    }
+        
+        close(watchChan)
+    }()
     
-    close(watchChan)
+    return watchChan
 }
 
 func (self *LockWatcher) ReleaseLock() error {

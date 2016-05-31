@@ -1,7 +1,8 @@
 package main
 
 import (
-	"time"
+    "time"
+    "fmt"
 
     "github.com/stretchr/testify/mock"
     "github.com/armon/consul-api"
@@ -397,6 +398,80 @@ var _ = Describe("LockWatcher", func() {
             Expect(queryOpts.WaitIndex).To(Equal(uint64(10)))
             Expect(queryOpts.WaitTime).To(Equal(lockDelay))
         })
+        
+        // AcquireLock can return false 
+        Describe("handles errors gracefully", func() {
+            It("returns false when unable to retrieve session info", func() {
+                mockSession.On("Info", sessionID, genericQueryOpts).Return(
+                    nil,
+                    nil,
+                    fmt.Errorf("Unexpected response code: 500 (rpc error: No cluster leader)"),
+                )
+                
+                locked, err := receiver.AcquireLock()
+                
+                mockSession.AssertExpectations(GinkgoT())
+                mockKV.AssertExpectations(GinkgoT())
+                Expect(locked).To(Equal(false))
+                Expect(err).To(BeNil())
+            })
+            
+            It("returns false when unable to retrieve key", func() {
+                mockSession.On("Info", sessionID, genericQueryOpts).Return(
+                    validSession,
+                    new(consulapi.QueryMeta),
+                    nil,
+                )
+
+                mockKV.On("Get", keyName, genericQueryOpts).Return(
+                    nil,
+                    nil,
+                    fmt.Errorf("Unexpected response code: 500 (rpc error: No cluster leader)"),
+                )
+                
+                locked, err := receiver.AcquireLock()
+                
+                mockSession.AssertExpectations(GinkgoT())
+                mockKV.AssertExpectations(GinkgoT())
+                Expect(locked).To(Equal(false))
+                Expect(err).To(BeNil())
+            })
+            
+            It("returns false when error acquiring lock on key", func() {
+                mockSession.On("Info", sessionID, genericQueryOpts).Return(
+                    validSession,
+                    new(consulapi.QueryMeta),
+                    nil,
+                )
+
+                mockKV.On("Get", keyName, genericQueryOpts).Return(
+                    &consulapi.KVPair{
+                        Key: keyName,
+                        Session: "",
+                    },
+                    new(consulapi.QueryMeta),
+                    nil,
+                )
+                
+                mockKV.On(
+                    "Acquire",
+                    mock.AnythingOfType("*consulapi.KVPair"),
+                    mock.AnythingOfType("*consulapi.WriteOptions"),
+                ).Return(
+                    false,
+                    nil,
+                    fmt.Errorf("Unexpected response code: 500 (rpc error: No cluster leader)"),
+                )
+                
+                locked, err := receiver.AcquireLock()
+                
+                mockSession.AssertExpectations(GinkgoT())
+                mockKV.AssertExpectations(GinkgoT())
+                Expect(locked).To(Equal(false))
+                Expect(err).To(BeNil())
+
+            })
+        })
     })
 
     Describe("lock watching", func() {
@@ -422,9 +497,7 @@ var _ = Describe("LockWatcher", func() {
 
             // channel used to notify when lock has been lost; it'll just get
             // closed
-            c := make(chan interface{}, 0)
-            
-            go receiver.WatchLock(c)
+            c := receiver.WatchLock()
             
             // wait for the lock to be lost
             select {
@@ -465,9 +538,7 @@ var _ = Describe("LockWatcher", func() {
 
             // channel used to notify when lock has been lost; it'll just get
             // closed
-            c := make(chan interface{}, 0)
-            
-            go receiver.WatchLock(c)
+            c := receiver.WatchLock()
             
             // wait for the lock to be lost
             select {
@@ -503,5 +574,4 @@ var _ = Describe("LockWatcher", func() {
             close(done)
         })
     })
-
 })

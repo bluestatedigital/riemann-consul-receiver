@@ -7,7 +7,7 @@ import (
     "fmt"
     "time"
     "net/http"
-    
+
     log "github.com/Sirupsen/logrus"
     flags "github.com/jessevdk/go-flags"
 
@@ -47,14 +47,14 @@ func sendHealthResults(riemann RiemannClient, healthResults []HealthCheck, updat
         // Riemann event TTL: A floating-point time, in seconds, that
         // this event is considered valid for
         eventTtl := float32((updateInterval * 3) / time.Second)
-        
+
         // convert Consul status to Riemann state
         state := map[string]string{
             "passing":  "ok",
             "warning":  "warning",
             "critical": "critical",
         }[healthCheck.Status]
-        
+
         // there may be multiple services with the same name on a given host;
         // these must have different serviceIds. there are also checks that
         // aren't associated with a specific service.  service-specific checks
@@ -70,17 +70,19 @@ func sendHealthResults(riemann RiemannClient, healthResults []HealthCheck, updat
             Attributes:  map[string]string{
                 "reporting_node": nodeName,
                 "datacenter":     dc,
+                "service_name":   healthCheck.ServiceName,
+                "service_id":     healthCheck.ServiceID,
                 "notes":          healthCheck.Notes,
             },
         }
-        
+
         err := riemann.Send(evt)
-        
+
         if err != nil {
             return err
         }
     }
-    
+
     return nil
 }
 
@@ -98,16 +100,16 @@ func mainLoop(
     // indicate to caller when this routine is done; just close channel so the
     // write doesn't block
     defer func() { close(done) }()
-    
+
     // (attempt to) capture stack trace on a panic
     defer recoverAndLog("mainLoop")
-    
+
     // used to notify when lock has been lost; it'll just get closed
     var lockWatchChan <-chan interface{}
-    
+
     // receives HealthCheck results
     var healthResultsChan <-chan []HealthCheck
-    
+
     // control channel for the health results checker
     var healthResultsAbort chan interface{}
 
@@ -116,7 +118,7 @@ func mainLoop(
 
     keepGoing := true
     haveLock := false
-    
+
     for keepGoing {
         // @todo update health check only when don't have lock or when health
         // results are processed successfully.
@@ -125,20 +127,20 @@ func mainLoop(
 
         if ! haveLock {
             log.Debug("acquiring lock")
-            
+
             // don't have lock; attempt to acquire it. AcquireLock() blocks.
             haveLock, err = lockWatcher.AcquireLock()
             checkError("error acquiring lock", err)
-            
+
             if haveLock {
                 log.Info("acquired lock")
-                
+
                 // connect to Riemann
                 riemannAddr := fmt.Sprintf("%s:%d", riemannHost, riemannPort)
                 log.Infof("connecting to Riemann at %s via %s", riemannAddr, riemannProto)
 
                 riemann, err = raidman.Dial(riemannProto, riemannAddr)
-                
+
                 if err != nil {
                     log.Errorf("unable to connect to Riemann: %v", err)
                     lockWatcher.ReleaseLock()
@@ -148,7 +150,7 @@ func mainLoop(
 
                     // get notified when we lose our lock
                     lockWatchChan = lockWatcher.WatchLock()
-                    
+
                     // start retrieving health results
                     healthResultsAbort = make(chan interface{})
                     healthResultsChan = healthChecker.WatchHealthResults(healthResultsAbort)
@@ -157,33 +159,33 @@ func mainLoop(
                 log.Debug("could not acquire lock")
             }
         }
-        
+
         if haveLock {
             // AcquireLock blocks for the updateInterval period.  we only have
             // channels to read from if we've got the lock.
-            
+
             select {
                 // wait for the lock to be lost
                 case <-lockWatchChan:
                     log.Warn("lost lock")
-                    
+
                     haveLock = false
-                    
+
                     // healthResultsAbort set to nil when closed; don't write to
                     // a closed channel!
                     if healthResultsAbort != nil {
                         healthResultsAbort <- nil
                         log.Debug("commanded health results watcher to stop")
-                        
+
                         close(healthResultsAbort)
                         healthResultsAbort = nil
                     }
-                    
+
                     lockWatchChan = nil
-                    
+
                     riemann.Close()
                     riemann = nil
-                
+
                 case healthResults, more := <-healthResultsChan:
                     // channel closed if there was an error retrieving the
                     // health results, or if the health checker has been
@@ -195,10 +197,10 @@ func mainLoop(
                     if more && haveLock {
                         log.Debug("processing health results")
                         err := sendHealthResults(riemann, healthResults, updateInterval, nodeName, dc)
-                        
+
                         if err != nil {
                             log.Errorf("error sending event to Riemann: %v", err)
-                            
+
                             lockWatcher.ReleaseLock()
                         }
                     } else {
@@ -206,7 +208,7 @@ func mainLoop(
 
                         if ! more {
                             log.Info("health checker has stopped")
-                            
+
                             if healthResultsAbort != nil {
                                 // healthResultsAbort is no longer being read by
                                 // the health checker.
@@ -227,47 +229,47 @@ func mainLoop(
 
 func main() {
     var opts Options
-    
+
     _, err := flags.Parse(&opts)
     if err != nil {
         os.Exit(1)
     }
-    
+
     if opts.PrintVersion {
         fmt.Printf("Version: %s\n", version)
         os.Exit(0)
     }
-    
+
     // parse UpdateInterval and LockDelay before setting up logging
     updateInterval, err := time.ParseDuration(opts.UpdateInterval)
     checkError(fmt.Sprintf("invalid update interval %s", opts.UpdateInterval), err)
-    
+
     lockDelay, err := time.ParseDuration(opts.LockDelay)
     checkError(fmt.Sprintf("invalid lock delay %s", opts.LockDelay), err)
-    
+
     if opts.Debug {
         // Only log the warning severity or above.
         log.SetLevel(log.DebugLevel)
     }
-    
+
     if opts.LogFile != "" {
         logFp, err := os.OpenFile(opts.LogFile, os.O_WRONLY | os.O_APPEND | os.O_CREATE, 0600)
         checkError(fmt.Sprintf("error opening %s", opts.LogFile), err)
-        
+
         defer logFp.Close()
-        
+
         // ensure panic output goes to log file
         // https://code.google.com/p/go/issues/detail?id=325
         syscall.Dup2(int(logFp.Fd()), 1)
         syscall.Dup2(int(logFp.Fd()), 2)
-        
+
         // log as JSON
         log.SetFormatter(&log.JSONFormatter{})
-        
+
         // send output to file
         log.SetOutput(logFp)
     }
-    
+
     // connect to Consul; like the default client, but with a timeout for http
     // requests tied to the update interval.  Shouldn't be necessary, but I've
     // seen a couple of instances where it appears there's a hang waiting for a
@@ -279,13 +281,13 @@ func main() {
             Timeout: updateInterval * 3,
         },
     }
-    
+
     consulConfig.Address = fmt.Sprintf("%s:%d", opts.ConsulHost, opts.ConsulPort)
     log.Infof("connecting to Consul at %s", consulConfig.Address)
 
     consul, err := consulapi.NewClient(consulConfig)
     checkError("unable to create consul client", err)
-    
+
     // need dc and node name for riemann event attributes
     agentInfo, err := consul.Agent().Self()
     checkError("unable to retrieve agent info", err)
@@ -303,20 +305,20 @@ func main() {
         "riemann-consul-receiver",
         "services/riemann-consul-receiver",
     )
-    
+
     checkError("unable to initialize consul receiver", err)
-    
+
     healthChecker := NewHealthChecker(consul.Health(), consul.Catalog(), updateInterval)
-    
+
     err = lockWatcher.RegisterService()
     checkError("unable to register service", err)
-    
+
     _, err = lockWatcher.InitSession()
     checkError("unable to init session", err)
-    
+
     // destroy the session when the process exits
     defer lockWatcher.DestroySession()
-    
+
     // receive OS signals so we can cleanly shut down
     // use syscall signals because os only provides Interrupt and Kill
     signalChan := make(chan os.Signal)
@@ -326,7 +328,7 @@ func main() {
 
     done := make(chan interface{})
     go mainLoop(lockWatcher, healthChecker, opts.RiemannHost, opts.RiemannPort, opts.Proto, updateInterval, nodeName, dc, done)
-    
+
     // Block until a signal is received or mainLoop crashes
     select {
         case <-signalChan:
